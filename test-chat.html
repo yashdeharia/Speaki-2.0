@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speaki Chat Tester</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        h1 { color: #333; }
+        .users { display: flex; gap: 20px; margin-bottom: 20px; }
+        .user-section { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .user-section h2 { font-size: 18px; margin-bottom: 15px; color: #333; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 4px; font-size: 12px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .message-display { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin: 10px 0; background: #fafafa; border-radius: 4px; font-size: 12px; }
+        .message { margin: 5px 0; padding: 5px; background: white; border-left: 3px solid #007bff; padding-left: 8px; }
+        .sent { border-left-color: #28a745; }
+        .received { border-left-color: #ffc107; }
+        .system { border-left-color: #6c757d; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Speaki Chat Test</h1>
+            <p>Test the real-time messaging system</p>
+        </div>
+
+        <div class="users">
+            <!-- User 1 -->
+            <div class="user-section">
+                <h2>User 1 (Sender)</h2>
+                
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Register/Login</label>
+                    <input type="email" id="email1" placeholder="user1@example.com" value="user1@example.com">
+                    <input type="password" id="pass1" placeholder="password123" value="password123">
+                    <button onclick="registerUser1()">Register User 1</button>
+                    <button onclick="loginUser1()">Login User 1</button>
+                </div>
+                
+                <div id="status1" class="status info" style="display:none;"></div>
+                
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Send Message</label>
+                    <input type="text" id="recipientId1" placeholder="Recipient User ID (2)" value="2">
+                    <input type="text" id="message1" placeholder="Type your message...">
+                    <button onclick="sendMessage1()">Send Message</button>
+                </div>
+
+                <h3 style="margin-top: 15px; font-size: 14px;">Messages</h3>
+                <div id="messages1" class="message-display"></div>
+
+                <button onclick="getHistory1()" style="margin-top: 10px;">Fetch History</button>
+            </div>
+
+            <!-- User 2 -->
+            <div class="user-section">
+                <h2>User 2 (Receiver)</h2>
+                
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Register/Login</label>
+                    <input type="email" id="email2" placeholder="user2@example.com" value="user2@example.com">
+                    <input type="password" id="pass2" placeholder="password123" value="password123">
+                    <button onclick="registerUser2()">Register User 2</button>
+                    <button onclick="loginUser2()">Login User 2</button>
+                </div>
+                
+                <div id="status2" class="status info" style="display:none;"></div>
+                
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">Send Message</label>
+                    <input type="text" id="recipientId2" placeholder="Recipient User ID (1)" value="1">
+                    <input type="text" id="message2" placeholder="Type your message...">
+                    <button onclick="sendMessage2()">Send Message</button>
+                </div>
+
+                <h3 style="margin-top: 15px; font-size: 14px;">Messages</h3>
+                <div id="messages2" class="message-display"></div>
+
+                <button onclick="getHistory2()" style="margin-top: 10px;">Fetch History</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://shiny-broccoli-vwqq9r96pv7295w-8080.app.github.dev";
+        let tokens = { user1: null, user2: null };
+        let ws = { user1: null, user2: null };
+        let userIds = { user1: null, user2: null };
+
+        function log(user, message) {
+            const div = document.getElementById(`messages${user}`);
+            const msg = document.createElement('div');
+            msg.className = 'message system';
+            msg.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            div.appendChild(msg);
+            div.scrollTop = div.scrollHeight;
+        }
+
+        function logMessage(user, sender, text) {
+            const div = document.getElementById(`messages${user}`);
+            const msg = document.createElement('div');
+            msg.className = `message ${sender === 'Self' ? 'sent' : 'received'}`;
+            msg.textContent = `[${sender}]: ${text}`;
+            div.appendChild(msg);
+            div.scrollTop = div.scrollHeight;
+        }
+
+        function showStatus(user, message, type) {
+            const status = document.getElementById(`status${user}`);
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            if (type === 'success') setTimeout(() => status.style.display = 'none', 3000);
+        }
+
+        async function registerUser(user, email, password) {
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showStatus(user, `✓ Registered: ${email}`, 'success');
+                    log(user, `Registered as ${email}`);
+                } else {
+                    showStatus(user, `✗ ${data.error || 'Registration failed'}`, 'error');
+                }
+            } catch (err) {
+                showStatus(user, `✗ Error: ${err.message}`, 'error');
+            }
+        }
+
+        async function loginUser(user, email, password) {
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    tokens[`user${user}`] = data.token;
+                    // Extract user ID from token (it's the subject claim)
+                    const payload = JSON.parse(atob(data.token.split('.')[1]));
+                    userIds[`user${user}`] = payload.sub;
+                    showStatus(user, `✓ Logged in (ID: ${payload.sub})`, 'success');
+                    log(user, `Logged in successfully (ID: ${payload.sub})`);
+                    connectWebSocket(user);
+                } else {
+                    showStatus(user, `✗ ${data.error || 'Login failed'}`, 'error');
+                }
+            } catch (err) {
+                showStatus(user, `✗ Error: ${err.message}`, 'error');
+            }
+        }
+
+        function connectWebSocket(user) {
+            const token = tokens[`user${user}`];
+            if (!token) {
+                showStatus(user, '✗ No token available', 'error');
+                return;
+            }
+
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `wss://shiny-broccoli-vwqq9r96pv7295w-8080.app.github.dev/ws/chat?token=${token}`;
+            
+            ws[`user${user}`] = new WebSocket(wsUrl);
+
+            ws[`user${user}`].onopen = () => {
+                showStatus(user, '✓ WebSocket connected', 'success');
+                log(user, 'Connected to WebSocket');
+            };
+
+            ws[`user${user}`].onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                logMessage(user, data.from === userIds[`user${user}`] ? 'Self' : data.from, data.message);
+            };
+
+            ws[`user${user}`].onerror = (error) => {
+                showStatus(user, `✗ WebSocket error`, 'error');
+                log(user, `WebSocket error: ${error}`);
+            };
+
+            ws[`user${user}`].onclose = () => {
+                showStatus(user, 'WebSocket disconnected', 'info');
+                log(user, 'Disconnected from WebSocket');
+            };
+        }
+
+        function sendMessage(user) {
+            const recipientId = document.getElementById(`recipientId${user}`).value;
+            const message = document.getElementById(`message${user}`).value;
+
+            if (!recipientId || !message) {
+                showStatus(user, '✗ Fill in all fields', 'error');
+                return;
+            }
+
+            if (!ws[`user${user}`] || ws[`user${user}`].readyState !== WebSocket.OPEN) {
+                showStatus(user, '✗ WebSocket not connected', 'error');
+                return;
+            }
+
+            ws[`user${user}`].send(JSON.stringify({
+                to: recipientId,
+                message: message
+            }));
+
+            document.getElementById(`message${user}`).value = '';
+            showStatus(user, '✓ Message sent', 'success');
+        }
+
+        async function getHistory(user) {
+            const otherUserId = user === 1 ? '2' : '1';
+            const token = tokens[`user${user}`];
+
+            if (!token) {
+                showStatus(user, '✗ Not logged in', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/messages/${otherUserId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    log(user, `Fetched ${data.messages ? data.messages.length : 0} messages`);
+                    if (data.messages) {
+                        data.messages.forEach(msg => {
+                            const sender = msg.sender_id === userIds[`user${user}`] ? 'Self' : msg.sender_id;
+                            logMessage(user, sender, msg.content);
+                        });
+                    }
+                } else {
+                    showStatus(user, `✗ ${data.error || 'Failed to fetch history'}`, 'error');
+                }
+            } catch (err) {
+                showStatus(user, `✗ Error: ${err.message}`, 'error');
+            }
+        }
+
+        function registerUser1() { registerUser(1, document.getElementById('email1').value, document.getElementById('pass1').value); }
+        function loginUser1() { loginUser(1, document.getElementById('email1').value, document.getElementById('pass1').value); }
+        function sendMessage1() { sendMessage(1); }
+        function getHistory1() { getHistory(1); }
+
+        function registerUser2() { registerUser(2, document.getElementById('email2').value, document.getElementById('pass2').value); }
+        function loginUser2() { loginUser(2, document.getElementById('email2').value, document.getElementById('pass2').value); }
+        function sendMessage2() { sendMessage(2); }
+        function getHistory2() { getHistory(2); }
+
+        log(1, 'Ready to test! Click "Register" then "Login" to begin.');
+        log(2, 'Ready to test! Click "Register" then "Login" to begin.');
+    </script>
+</body>
+</html>
